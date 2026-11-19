@@ -1,5 +1,9 @@
 # 19 November 2026 — one front page
 
+[![make.fun · news-image-20261119](https://make.fun/badge/news-image-20261119.svg)](https://make.fun/bounty/news-image-20261119?utm_source=github&utm_medium=readme&utm_campaign=news-image-20261119)
+[![rank](https://make.fun/badge/news-image-20261119/fitrylaela/Make.fun/rank.svg)](https://make.fun/bounty/news-image-20261119/leaderboard?utm_source=github&utm_medium=readme&utm_campaign=news-image-20261119)
+[![reward](https://make.fun/badge/news-image-20261119/fitrylaela/Make.fun/reward.svg)](https://make.fun/bounty/news-image-20261119?utm_source=github&utm_medium=readme&utm_campaign=news-image-20261119)
+
 An entry for make.fun's bounty *Sum up 19 November's world news in one image*.
 
 `entry.png` is a single 1024×1024 page that sums up Thursday 19 November 2026 in
