@@ -238,7 +238,7 @@ PANELS = [
     ("WAR \u00b7 EUROPE", "KERCH BRIDGE\nSTRUCK AGAIN", _icon_bridge, RED),
     ("POLITICS \u00b7 ASIA", "MONGOLIA'S\nPRESIDENT OUT", _icon_parliament, INK),
     ("POLITICS \u00b7 EUROPE", "SERBIA'S NEW\nACTING HEAD", _icon_ballot, BLUE),
-    ("DIPLOMACY \u00b7 EUROPE", "BERLIN RALLIES\nFOR UKRAINE", _icon_flags, BLUE),
+    ("DIPLOMACY \u00b7 EUROPE", "37 NATIONS\nFOR UKRAINE", _icon_flags, BLUE),
     ("CONFLICT \u00b7 M. EAST", "HOUTHI MISSILE\nHITS RIYADH", _icon_missile, RED),
     ("CONFLICT \u00b7 ASIA", "BANGLADESH\nOFFICES BURN", _icon_fire, RED),
     ("NATURE \u00b7 OCEANIA", "WHALES DIE ON\nNZ BEACH", _icon_whale, BLUE),
