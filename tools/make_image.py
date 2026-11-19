@@ -5,6 +5,8 @@ Labels are set large so the page still reads when it is shown small, roughly
 300 pixels across. Output is deterministic: the same code writes the same bytes.
 """
 
+import math
+
 from PIL import Image, ImageDraw, ImageFont
 
 SIZE = 1024
@@ -136,6 +138,42 @@ def _icon_flags(d, box, color):
                    (px, y0 + h * (ph + 0.22))], fill=color)
 
 
+def _icon_missile(d, box, color):
+    """A missile falling on a tower: the Houthi strike on Riyadh."""
+    x0, y0, x1, y1 = box
+    w, h = x1 - x0, y1 - y0
+    d.polygon([(x0 + w * 0.42, y0 + h * 0.34), (x0 + w * 0.62, y0 + h * 0.28),
+               (x0 + w * 0.68, y0 + h * 0.92), (x0 + w * 0.40, y0 + h * 0.92)], fill=color)
+    for wy in (0.46, 0.62, 0.78):
+        d.line([(x0 + w * 0.45, y0 + h * wy), (x0 + w * 0.64, y0 + h * (wy - 0.02))],
+               fill=PAPER, width=max(4, int(h * 0.030)))
+    d.line([(x0 + w * 0.04, y0 + h * 0.04), (x0 + w * 0.30, y0 + h * 0.26)],
+           fill=color, width=max(4, int(w * 0.022)))
+    mx, my = x0 + w * 0.34, y0 + h * 0.30
+    s = w * 0.10
+    d.polygon([(mx + s, my + s * 0.6), (mx - s * 0.5, my - s * 0.9),
+               (mx - s * 0.9, my + s * 0.2)], fill=RED)
+    bx, by, r = x0 + w * 0.56, y0 + h * 0.40, w * 0.13
+    for ang in range(0, 360, 45):
+        a = math.radians(ang)
+        d.line([(bx + r * 0.45 * math.cos(a), by + r * 0.45 * math.sin(a)),
+                (bx + r * math.cos(a), by + r * math.sin(a))],
+               fill=RED, width=max(4, int(w * 0.020)))
+
+
+def _icon_whale(d, box, color):
+    """A stranded whale on a beach: New Zealand's Ninety Mile Beach."""
+    x0, y0, x1, y1 = box
+    w, h = x1 - x0, y1 - y0
+    d.rectangle([x0 + w * 0.02, y0 + h * 0.72, x1 - w * 0.02, y0 + h * 0.80], fill=color)
+    d.line([(x0 + w * 0.02, y0 + h * 0.82), (x1 - w * 0.02, y0 + h * 0.86)],
+           fill=color, width=max(3, int(h * 0.020)))
+    d.ellipse([x0 + w * 0.16, y0 + h * 0.30, x0 + w * 0.66, y0 + h * 0.74], fill=color)
+    d.polygon([(x0 + w * 0.64, y0 + h * 0.46), (x0 + w * 0.84, y0 + h * 0.30),
+               (x0 + w * 0.82, y0 + h * 0.60), (x0 + w * 0.64, y0 + h * 0.58)], fill=color)
+    d.ellipse([x0 + w * 0.22, y0 + h * 0.46, x0 + w * 0.27, y0 + h * 0.51], fill=PAPER)
+
+
 def _icon_earth(d, box, color):
     x0, y0, x1, y1 = box
     w, h = x1 - x0, y1 - y0
@@ -201,9 +239,9 @@ PANELS = [
     ("POLITICS \u00b7 ASIA", "MONGOLIA'S\nPRESIDENT OUT", _icon_parliament, INK),
     ("POLITICS \u00b7 EUROPE", "SERBIA'S NEW\nACTING HEAD", _icon_ballot, BLUE),
     ("DIPLOMACY \u00b7 EUROPE", "BERLIN RALLIES\nFOR UKRAINE", _icon_flags, BLUE),
-    ("CLIMATE \u00b7 WORLD", "COP31 NEARS\nITS CLOSE", _icon_earth, GREEN),
+    ("CONFLICT \u00b7 M. EAST", "HOUTHI MISSILE\nHITS RIYADH", _icon_missile, RED),
     ("CONFLICT \u00b7 ASIA", "BANGLADESH\nOFFICES BURN", _icon_fire, RED),
-    ("TRADE \u00b7 PACIFIC", "PHILIPPINES,\nCHILE SIGN PACT", _icon_flags, GOLD),
+    ("NATURE \u00b7 OCEANIA", "WHALES DIE ON\nNZ BEACH", _icon_whale, BLUE),
     ("SPORT \u00b7 AMERICAS", "MLS CUP\nPLAYOFFS OPEN", _icon_trophy, GREEN),
 ]
 

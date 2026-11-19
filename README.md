@@ -22,9 +22,9 @@ harness output directory. The image is drawn by `tools/make_image.py`.
 | MONGOLIA'S PRESIDENT OUT | State Great Khural accepts President Khürelsükh's resignation |
 | SERBIA'S NEW ACTING HEAD | Aleksandar Čupić elected speaker, becoming acting president |
 | BERLIN RALLIES FOR UKRAINE | Germany hosts dozens of countries on aid for Ukraine |
-| COP31 NEARS ITS CLOSE | COP31 in Antalya, Turkey, enters its final days |
+| HOUTHI MISSILE HITS RIYADH | A Houthi missile damages the Public Investment Fund Tower in Riyadh; no casualties |
 | BANGLADESH OFFICES BURN | Awami League mobs loot and burn BNP and Jamaat property across several districts |
-| PHILIPPINES, CHILE SIGN PACT | First Philippine free-trade agreement with a Latin American country, signed at APEC |
+| WHALES DIE ON NZ BEACH | Nineteen sperm whales die after stranding at Ninety Mile Beach |
 | MLS CUP PLAYOFFS OPEN | Wild-card round begins with Orlando City and Seattle Sounders at home |
 
 ## Run
