@@ -88,6 +88,14 @@ export function stepText(step: FarmStep): string {
   return s;
 }
 
+/** A dollar figure in the unit a reader thinks in: $2.8B, $513.8M, $45.2K. */
+function compactUsd(n: number): string {
+  if (n >= 1e9) return `$${(n / 1e9).toFixed(1)}B`;
+  if (n >= 1e6) return `$${(n / 1e6).toFixed(1)}M`;
+  if (n >= 1e3) return `$${(n / 1e3).toFixed(1)}K`;
+  return `$${Math.round(n)}`;
+}
+
 /** The chain a reader will actually use: the first one, which is where the TVL is largest. */
 function chainOf(p: SnapshotProtocol): string {
   return p.chains.length > 0 ? p.chains[0]! : 'its main chain';
@@ -109,77 +117,203 @@ function holdDaysFor(age: number | null): number {
   return 30;
 }
 
-/** The category's qualifying action, in words a farmer can follow, and what it earns on. */
-function actionFor(p: SnapshotProtocol, capital: number, chain: string): { action: string; earns: string } {
+/** A category's plan: what to do, how to stay active, what to check before claiming, what to record. */
+interface CategoryPlan {
+  qualify: string;
+  earns: string;
+  retain: string;
+  claim: string;
+  record: string;
+}
+
+/** The category's plan, in words a farmer can follow, from the protocol's own record. */
+function planFor(p: SnapshotProtocol, capital: number, chain: string): CategoryPlan {
   const c = (p.category ?? '').toLowerCase();
   const name = p.name;
   if (c.includes('lend') || c.includes('cdp') || c.includes('collateral'))
-    return { action: `Supply $${capital} of USDC to ${name} on ${chain} and keep the position open.`, earns: 'supply-side interest and a borrowing position that counts as usage' };
+    return {
+      qualify: `Supply $${capital} of USDC to ${name} on ${chain} and keep the position open.`,
+      earns: 'supply-side interest and a borrowing position that counts as usage',
+      retain: `Borrow a small amount against the supply — well under the position's limit — and repay it a few days later. A lending protocol counts a wallet that both supplies and borrows as a real user, not a one-way depositor.`,
+      claim: `Check ${name}'s own app for a points or rewards tab before withdrawing, and confirm whether rewards accrue on supplied balance, borrowed balance or both; claiming from a link anyone else posted is how farm wallets get drained.`,
+      record: `the supply and borrow transaction hashes, the market you used, and the health factor you left the position at`,
+    };
   if (c.includes('dex') || c.includes('leveraged farm'))
-    return { action: `Provide $${capital} of liquidity to ${name}'s deepest pool on ${chain}.`, earns: 'swap fees and a liquidity position in the protocol\'s own pool' };
+    return {
+      qualify: `Provide $${capital} of liquidity to ${name}'s deepest pool on ${chain}.`,
+      earns: 'swap fees and a liquidity position in the protocol\'s own pool',
+      retain: `Re-range or rebalance the position once a week rather than leaving it out of range; an out-of-range position earns nothing and reads as inactive, while a rebalance is a second week of qualifying activity.`,
+      claim: `Check whether ${name} rewards the pool you chose or only listed pools, and whether fees must be claimed before the position is closed; unclaimed fees are the most commonly forfeited reward on a DEX.`,
+      record: `the pool address, the position NFT id if the DEX issues one, and each rebalance's transaction hash`,
+    };
   if (c.includes('yield'))
-    return { action: `Deposit $${capital} of USDC into ${name}'s highest-TVL vault on ${chain}.`, earns: 'vault yield and a deposit that stays through the snapshot' };
+    return {
+      qualify: `Deposit $${capital} of USDC into ${name}'s highest-TVL vault on ${chain}.`,
+      earns: 'vault yield and a deposit that stays through the snapshot',
+      retain: `Leave the deposit through at least one full epoch and check the vault's share price moved, rather than adding and removing in the same week; a deposit that spans a snapshot is what a points program can see.`,
+      claim: `Confirm on ${name}'s own page whether rewards are paid in the vault's own token or a separate one, and whether the vault must be exited to claim.`,
+      record: `the vault address, the share count you received, and the entry and exit share prices`,
+    };
   if (c.includes('bridge'))
-    return { action: `Bridge $${capital} of USDC to ${chain} through ${name} and use the bridged funds there.`, earns: 'bridging volume in both directions' };
+    return {
+      qualify: `Bridge $${capital} of USDC to ${chain} through ${name} and use the bridged funds there.`,
+      earns: 'bridging volume in both directions',
+      retain: `Bridge back a portion after a few days rather than leaving funds stranded. Volume in both directions is what a bridge measures, and a round trip costs little on a cheap chain.`,
+      claim: `Bridge points are usually counted per direction and per chain pair, so check ${name}'s own dashboard for which pairs qualify before you assume your route counted.`,
+      record: `each route's source and destination chain, the transaction hash on both sides, and the amount that actually arrived after fees`,
+    };
   if (c.includes('staking') || c.includes('restak'))
-    return { action: `Stake $${capital} of the chain's staking asset through ${name} and keep the receipt token.`, earns: 'staking yield on the receipt, held rather than sold' };
-  if (c.includes('perpetual') || c.includes('derivative') || c.includes('options'))
-    return { action: `Deposit $${capital} of USDC as margin on ${name} on ${chain} and open one small hedge.`, earns: 'trading volume with the margin kept on the venue' };
+    return {
+      qualify: `Stake $${capital} of the chain's staking asset through ${name} and keep the receipt token.`,
+      earns: 'staking yield on the receipt, held rather than sold',
+      retain: `Hold the receipt token rather than selling it; a receipt that is sold back to the market is a wallet that took the yield and left, which is the opposite of what a restaking points program rewards.`,
+      claim: `Check whether ${name} rewards the receipt token holder or the underlying staker, and whether an unbonding period delays the exit past the snapshot.`,
+      record: `the receipt token's contract address, the amount minted, and the unbonding period that applies to your position`,
+    };
+  if (c.includes('perpetual') || c.includes('derivative') || c.includes('options') || c.includes('basis'))
+    return {
+      qualify: `Deposit $${capital} of USDC as margin on ${name} on ${chain} and open one small hedge.`,
+      earns: 'trading volume with the margin kept on the venue',
+      retain: `Keep the margin on the venue between trades instead of withdrawing after each one; a margin balance that stays is what a trading points program measures, and it costs nothing to leave it there.`,
+      claim: `Check ${name}'s own fee and rewards page for whether points follow volume, open interest or margin held — the three reward very different behaviour.`,
+      record: `each position's size, entry and exit, the funding paid, and the margin balance you kept on the venue`,
+    };
   if (c.includes('prediction'))
-    return { action: `Fund $${capital} on ${name} and take one position on a market you can follow.`, earns: 'a settled position in the protocol\'s own market' };
-  if (c.includes('curator') || c.includes('allocator') || c.includes('risk'))
-    return { action: `Deposit $${capital} into a ${name} vault on ${chain} and keep the shares.`, earns: 'vault shares that stay allocated through the snapshot' };
+    return {
+      qualify: `Fund $${capital} on ${name} and take one position on a market you can follow.`,
+      earns: 'a settled position in the protocol\'s own market',
+      retain: `Let at least one position settle rather than closing it early; a settled position is a resolved trade the protocol can verify, while an early exit is indistinguishable from wash activity.`,
+      claim: `Check whether ${name} rewards volume, liquidity provided, or markets resolved, and claim only from the protocol's own site.`,
+      record: `the market you took, the price you entered at, the resolution, and the payout transaction hash`,
+    };
+  if (c.includes('curator') || c.includes('allocator') || c.includes('risk') || c.includes('liquidity manager'))
+    return {
+      qualify: `Deposit $${capital} into a ${name} vault on ${chain} and keep the shares.`,
+      earns: 'vault shares that stay allocated through the snapshot',
+      retain: `Stay in one vault across a full reallocation cycle instead of hopping between vaults; a curator's points follow allocation that persisted, not deposits that moved weekly.`,
+      claim: `Read the vault's own fee and rewards terms on ${name}'s page; a curator vault can pay rewards in the underlying, in a separate token, or not at all, and the terms differ per vault.`,
+      record: `the vault address, the shares you hold, and the curator's stated fee so you can net the yield against it`,
+    };
   if (c.includes('stable'))
-    return { action: `Mint or deposit $${capital} of the stable asset through ${name} on ${chain}.`, earns: 'supply of the stable asset and its peg volume' };
+    return {
+      qualify: `Mint or deposit $${capital} of the stable asset through ${name} on ${chain}.`,
+      earns: 'supply of the stable asset and its peg volume',
+      retain: `Hold the minted asset across a snapshot rather than minting and redeeming in one session; a stablecoin's usage is measured by supply that persisted.`,
+      claim: `Check ${name}'s own page for whether rewards follow minting, holding or providing liquidity, and whether a redemption fee eats the yield.`,
+      record: `the mint and redemption hashes, the collateral ratio you left the position at, and the redemption fee that applied`,
+    };
   if (c.includes('rwa'))
-    return { action: `Mint $${capital} of ${name}'s yield asset on ${chain} and hold it.`, earns: 'the yield the asset pays while it is held' };
+    return {
+      qualify: `Mint $${capital} of ${name}'s yield asset on ${chain} and hold it.`,
+      earns: 'the yield the asset pays while it is held',
+      retain: `Hold through at least one distribution date; an RWA pays on a schedule, so a position closed before the date earns the exposure and none of the yield.`,
+      claim: `Check ${name}'s own terms for the distribution schedule, any lock-up, and whether the asset can be redeemed at all on ${chain}.`,
+      record: `the asset's contract address, the distribution dates you held through, and the yield actually paid`,
+    };
   if (c.includes('insurance'))
-    return { action: `Buy $${capital} of cover from ${name} on ${chain} and keep the policy.`, earns: 'premium the protocol keeps, with the cover held' };
+    return {
+      qualify: `Buy $${capital} of cover from ${name} on ${chain} and keep the policy.`,
+      earns: 'premium the protocol keeps, with the cover held',
+      retain: `Keep the policy active past its first period rather than cancelling; underwriting capacity that stayed is what an insurance protocol counts.`,
+      claim: `Check ${name}'s own page for whether rewards follow premium paid, cover provided as an underwriter, or capital staked in the backstop.`,
+      record: `the policy id, the premium paid, the cover period, and the claim terms you were given`,
+    };
   if (c.includes('index'))
-    return { action: `Mint $${capital} of ${name}'s index on ${chain} and hold the basket.`, earns: 'the index exposure, held rather than redeemed' };
+    return {
+      qualify: `Mint $${capital} of ${name}'s index on ${chain} and hold the basket.`,
+      earns: 'the index exposure, held rather than redeemed',
+      retain: `Hold the index across a rebalance rather than minting and redeeming around it; a rebalance is where an index protocol sees who actually tracks it.`,
+      claim: `Check ${name}'s own page for the rebalance schedule and whether rewards follow holding or minting volume.`,
+      record: `the index token address, the components you received, and the rebalance dates you held through`,
+    };
   if (c.includes('launchpad'))
-    return { action: `Fund $${capital} on ${name} on ${chain} and take part in one launch.`, earns: 'a subscription that counts as demand on the launchpad' };
-  return { action: `Deposit $${capital} of USDC into ${name} on ${chain} and keep the position open.`, earns: 'a deposit that stays in the protocol through the snapshot' };
+    return {
+      qualify: `Fund $${capital} on ${name} on ${chain} and take part in one launch.`,
+      earns: 'a subscription that counts as demand on the launchpad',
+      retain: `Take part in a second launch rather than one; a launchpad measures repeat participation, and a single subscription reads as a one-off.`,
+      claim: `Check ${name}'s own page for whether rewards follow subscription size, number of launches joined, or tokens held after the sale.`,
+      record: `each launch you joined, the amount subscribed, the allocation received, and the vesting terms`,
+    };
+  if (c.includes('chain'))
+    return {
+      qualify: `Bridge $${capital} of USDC onto ${name} through its official bridge and use the funds there.`,
+      earns: 'bridged liquidity and on-chain activity on the chain itself',
+      retain: `Keep the funds on ${name} and make a few transactions over separate weeks; a chain measures addresses that stayed and used it, not addresses that bridged in and straight out.`,
+      claim: `Check ${name}'s own official channels for an incentives or points program, and treat any other link as hostile — chain airdrop phishing is the most common drain of farm wallets.`,
+      record: `the bridge transaction hash, the address you used on ${name}, and every transaction you made there`,
+    };
+  if (c.includes('payment') || c.includes('card'))
+    return {
+      qualify: `Move $${capital} through ${name} on ${chain} and complete one real transaction end to end.`,
+      earns: 'settled volume the protocol can verify, not a deposit that sat idle',
+      retain: `Complete a second transaction in a later week rather than one large one; payment products measure recurring settled volume.`,
+      claim: `Check ${name}'s own terms for whether rewards follow volume, cards issued or merchants onboarded, and whether a fee applies to the route you used.`,
+      record: `each transaction's amount, date and hash, and the fee the protocol charged`,
+    };
+  if (c.includes('otc') || c.includes('governance') || c.includes('farm') || c.includes('cedefi') || c.includes('cefi') || c.includes('btc'))
+    return {
+      qualify: `Deposit $${capital} into ${name} on ${chain} through the product its own site documents, and keep the position open.`,
+      earns: 'a position the protocol itself records against your address',
+      retain: `Return in a later week and make one more qualifying action rather than depositing once; a protocol with no points page yet still measures wallets that came back.`,
+      claim: `Read ${name}'s own documentation for how it intends to recognise users, and claim only from a link the protocol itself publishes — never from a third party.`,
+      record: `the product you used, the transaction hashes, and the terms the protocol published when you entered`,
+    };
+  return {
+    qualify: `Deposit $${capital} of USDC into ${name} on ${chain} and keep the position open.`,
+    earns: 'a deposit that stays in the protocol through the snapshot',
+    retain: `Return in a later week and make one more qualifying action rather than depositing once; a protocol with no points page yet still measures wallets that came back.`,
+    claim: `Check ${name}'s own site or docs for a points or rewards page before withdrawing, and claim only from a link the protocol itself publishes.`,
+    record: `the transaction hashes, the amount deposited, and the terms the protocol published when you entered`,
+  };
 }
 
 /**
  * A protocol's farm plan: six steps, each an action with a cost and a time. Every step is derived from
- * the protocol's own record (category, chains, TVL, age), never from a hand-written list of names.
+ * the protocol's own record (category, chains, TVL, growth, age), never from a hand-written list of
+ * names, and no step is the same sentence for every protocol.
  */
 export function farmSteps(p: SnapshotProtocol, age: number | null): FarmStep[] {
   const chain = chainOf(p);
   const capital = capitalFor(p);
   const hold = holdDaysFor(age);
   const gas = capital >= 150 ? 8 : 4;
-  const { action, earns } = actionFor(p, capital, chain);
+  const { qualify, earns, retain, claim, record } = planFor(p, capital, chain);
+  const otherChains = p.chains.slice(1, 3);
+  const growth = p.change_7d;
+  const growthNote =
+    growth === null || !Number.isFinite(growth)
+      ? 'its seven-day change is unrecorded'
+      : growth > 0
+        ? `it grew ${growth.toFixed(1)}% over seven days`
+        : `it fell ${Math.abs(growth).toFixed(1)}% over seven days`;
   return [
     {
-      text: `Open a fresh wallet for this position alone and keep its seed phrase offline; never reuse the wallet you hold long-term funds in.`,
-      cost: 'under $3 of gas to create and fund the wallet',
-      time: '5 minutes',
+      text: `Fund a wallet on ${chain} with $${capital} of USDC plus about $${gas} of the chain's own gas token${otherChains.length > 0 ? `; ${p.name} also runs on ${otherChains.join(' and ')}, but ${chain} is where its TVL is largest` : ''}. Use a wallet you keep for this position alone.`,
+      cost: `$${capital + gas} in total, of which $${gas} is gas`,
+      time: '10 minutes',
     },
     {
-      text: `${action} This is the qualifying action: ${earns}.`,
+      text: `${qualify} This is the qualifying action: ${earns}.`,
       cost: `$${capital} of capital and about $${gas} of gas`,
       time: '15 minutes to set up',
     },
     {
-      text: `Return once a week and make one more qualifying action, such as a deposit, a borrow, a swap or a vote, so the wallet is active in more than one week.`,
-      cost: 'about $2 of gas a week',
-      time: '10 minutes a week',
+      text: retain,
+      cost: 'about $2 to $5 of gas for the second action',
+      time: '10 minutes, in a later week',
     },
     {
-      text: `Keep the position open for at least ${hold} days. A protocol that has run ${age === null ? 'an unrecorded time' : `${age} days`} without a token is most likely to reward positions that were open across several snapshots, not one-day in-and-out.`,
+      text: `Keep the position open for at least ${hold} days. ${p.name} holds ${compactUsd(p.tvl_usd)} of TVL and has run ${age === null ? 'an unrecorded time' : `${age} days`} without a token, and ${growthNote} — a record like that rewards positions held across snapshots, not one-day in-and-out.`,
       cost: `the $${capital} stays in the position and is not spent`,
       time: `${hold} days`,
     },
     {
-      text: `Before you withdraw, open ${p.name}'s own site or docs and check for a points or rewards page; claim only from the link the protocol itself publishes, and never pay a fee to claim.`,
+      text: claim,
       cost: 'nothing to check, and never pay to claim',
       time: '10 minutes',
     },
     {
-      text: `Write the wallet address, every date and every transaction hash in a farm log, so the position can be repeated or unwound without guessing what it was.`,
+      text: `Log ${record}, and keep the log where the position is not — a wallet compromised with its own history is a farm lost with its proof.`,
       cost: 'nothing but the log',
       time: '5 minutes',
     },
