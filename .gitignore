@@ -1,0 +1,5 @@
+out/
+.shots-tmp/
+node_modules/
+.p*.png
+.preview*.png
