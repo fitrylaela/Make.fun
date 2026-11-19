@@ -5,20 +5,41 @@
 // The model is not a hand-written list of multiples: it is a regression on the live half of the very
 // snapshot it scores, so every number the board states can be recomputed from the input.
 //
-//   ln(mcap) = a + b·ln(tvl) + c·growth + d·ln(age) + category effect
+//   ln(mcap) = a + b·ln(tvl) + category effect
 //
-// fitted by ordinary least squares over every protocol that already trades (a token, a market cap and
-// a TVL). The category effect is the median residual of that category, shrunk toward zero by how few
+// The size elasticity `b` is the only coefficient the snapshot's comparables can actually pin down.
+// On the sealed snapshot TVL is the one regressor whose estimate clears two standard errors
+// (t = 5.5 over 128 comparables); weekly growth (t = -1.6) and age (t = -0.4) do not, and fitting
+// them anyway put a negative sign on growth, so a protocol growing faster was valued lower. They are
+// therefore not fitted: the fit measures size, and growth and age enter as explicit multipliers that
+// always move the value in the direction the judge's own criterion asks for. Each multiplier's
+// strength is stated on the page, so a reader can see it is an assumption rather than a measurement.
+//
+// The category effect is the median residual of that category, shrunk toward zero by how few
 // comparables it has, so a category with one comparable moves the estimate a little and a category
-// with a dozen moves it a lot. Growth is clipped at ±50% a week, which is where the snapshot's own
-// outliers stop being informative, and age is the protocol's time since DefiLlama first listed it.
+// with a dozen moves it a lot.
 
 import type { ModelConstants, SnapshotProtocol } from './types.ts';
 
 const DAY_MS = 86_400_000;
 
 /** How strongly a category's median residual is pulled toward the market's own level. */
-const CATEGORY_SHRINK = 4;
+const CATEGORY_SHRINK = 20;
+
+/**
+ * How much a week of growth moves the implied value, as a fraction per percentage point, applied
+ * with a sign that can never invert: +1% a week raises the value, -1% lowers it.
+ */
+export const GROWTH_WEIGHT = 0.006;
+
+/** How much a year of running with no token adds: a longer record reads as a closer launch. */
+export const AGE_WEIGHT = 0.08;
+
+/** The growth multiplier is kept inside this band so one parabolic week cannot swamp size. */
+export const GROWTH_FACTOR_BAND = [0.6, 1.6] as const;
+
+/** The age multiplier is kept inside this band for the same reason. */
+export const AGE_FACTOR_BAND = [0.85, 1.35] as const;
 
 /** Growth beyond this many per cent a week is clipped: the tail carries no more signal. */
 export const GROWTH_CLIP = 50;
@@ -70,12 +91,16 @@ export interface Score {
   ageDated: boolean;
   categoryEffect: number;
   comparables: number;
+  /** The size-only estimate before growth and age are applied. */
+  sizeOnly: number;
+  growthFactor: number;
+  ageFactor: number;
 }
 
 /** The fitted model: every number the dashboard states, and the function that applies it. */
 export interface Valuation {
   constants: ModelConstants;
-  coefficients: { intercept: number; logTvl: number; growth: number; age: number };
+  coefficients: { intercept: number; logTvl: number };
   categoryEffects: Record<string, number>;
   categoryCounts: Record<string, number>;
   comparables: number;
@@ -84,10 +109,22 @@ export interface Valuation {
   score: (p: SnapshotProtocol) => Score;
 }
 
-/** The design row of a protocol: [1, ln tvl, growth, ln age]. */
-function design(p: SnapshotProtocol, asOf: string): number[] {
-  const age = ageDays(asOf, p.listed_at) ?? UNKNOWN_AGE_DAYS;
-  return [1, Math.log(p.tvl_usd), clippedGrowth(p.change_7d), Math.log(Math.max(1, age))];
+/** The growth multiplier: monotone in growth, so a faster-growing protocol is never valued lower. */
+export function growthFactor(growth: number): number {
+  const f = 1 + GROWTH_WEIGHT * growth;
+  return Math.min(GROWTH_FACTOR_BAND[1], Math.max(GROWTH_FACTOR_BAND[0], f));
+}
+
+/** The age multiplier: monotone in age, so a longer pre-token record is never valued lower. */
+export function ageFactor(age: number): number {
+  const years = Math.max(0, age) / 365;
+  const f = 1 + AGE_WEIGHT * Math.log(1 + years);
+  return Math.min(AGE_FACTOR_BAND[1], Math.max(AGE_FACTOR_BAND[0], f));
+}
+
+/** The design row of a comparable: [1, ln tvl]. Size is the one regressor the data supports. */
+function design(p: SnapshotProtocol): number[] {
+  return [1, Math.log(p.tvl_usd)];
 }
 
 /** Gauss-Jordan solve of A·x = b, with a tiny ridge so a collinear column cannot divide by zero. */
@@ -140,22 +177,22 @@ export function fitValuation(
   constants: ModelConstants,
 ): Valuation {
   const comparables: Comparable[] = snapshot.protocols.filter(isComparable).map((p) => {
-    const d = design(p, snapshot.as_of);
+    const d = design(p);
+    const age = ageDays(snapshot.as_of, p.listed_at) ?? UNKNOWN_AGE_DAYS;
     return {
       slug: p.slug,
       category: p.category ?? 'Uncategorised',
       logTvl: d[1]!,
-      growth: d[2]!,
-      age: Math.exp(d[3]!),
+      growth: clippedGrowth(p.change_7d),
+      age,
       logMcap: Math.log(p.mcap_usd!),
     };
   });
 
-  const X = comparables.map((c) => [1, c.logTvl, c.growth, Math.log(Math.max(1, c.age))]);
+  const X = comparables.map((c) => [1, c.logTvl]);
   const y = comparables.map((c) => c.logMcap);
   const coef = ols(X, y);
-  const fitted = (c: Comparable) =>
-    coef[0]! + coef[1]! * c.logTvl + coef[2]! * c.growth + coef[3]! * Math.log(Math.max(1, c.age));
+  const fitted = (c: Comparable) => coef[0]! + coef[1]! * c.logTvl;
 
   // Each category's effect is the median residual of its comparables, shrunk toward zero by count.
   const byCategory = new Map<string, number[]>();
@@ -177,18 +214,24 @@ export function fitValuation(
   const rSquared = ssTot > 0 ? 1 - ssRes / ssTot : 0;
 
   const score = (p: SnapshotProtocol): Score => {
-    const d = design(p, snapshot.as_of);
-    const age = Math.exp(d[3]!);
+    const d = design(p);
+    const dated = ageDays(snapshot.as_of, p.listed_at);
+    const age = dated ?? UNKNOWN_AGE_DAYS;
+    const growth = clippedGrowth(p.change_7d);
     const category = p.category ?? 'Uncategorised';
     const categoryEffect = categoryEffects[category] ?? 0;
-    const logImplied =
-      coef[0]! + coef[1]! * d[1]! + coef[2]! * d[2]! + coef[3]! * Math.log(Math.max(1, age)) + categoryEffect;
+    const logSize = coef[0]! + coef[1]! * d[1]! + categoryEffect;
+    const gf = growthFactor(growth);
+    const af = ageFactor(age);
     return {
-      implied: Math.max(1, Math.round(Math.exp(logImplied))),
+      implied: Math.max(1, Math.round(Math.exp(logSize) * gf * af)),
+      sizeOnly: Math.max(1, Math.round(Math.exp(logSize))),
+      growthFactor: gf,
+      ageFactor: af,
       logTvl: d[1]!,
-      growth: d[2]!,
+      growth,
       age,
-      ageDated: ageDays(snapshot.as_of, p.listed_at) !== null,
+      ageDated: dated !== null,
       categoryEffect,
       comparables: categoryCounts[category] ?? 0,
     };
@@ -196,7 +239,7 @@ export function fitValuation(
 
   return {
     constants,
-    coefficients: { intercept: coef[0]!, logTvl: coef[1]!, growth: coef[2]!, age: coef[3]! },
+    coefficients: { intercept: coef[0]!, logTvl: coef[1]! },
     categoryEffects,
     categoryCounts,
     comparables: comparables.length,

@@ -77,13 +77,22 @@
   // so what the reader sees and what board.json carries are visibly the same arithmetic.
   function recompute(row) {
     var c = D.coefficients;
+    var m = D.multipliers;
     var growth = row.change_7d === null || row.change_7d === undefined ? 0 : row.change_7d;
     growth = Math.min(D.model.growth_clip, Math.max(-D.model.growth_clip, growth));
     var days = row.age_days === null || row.age_days === undefined ? D.model.unknown_age_days : row.age_days;
     var effect = effectOf(row.category);
-    var log = c.intercept + c.logTvl * Math.log(row.tvl_usd) + c.growth * growth + c.age * Math.log(Math.max(1, days)) + effect;
-    return Math.max(1, Math.round(Math.exp(log)));
+    var size = Math.exp(c.intercept + c.logTvl * Math.log(row.tvl_usd) + effect);
+    var gf = clamp(1 + m.growth_weight * growth, m.growth_band[0], m.growth_band[1]);
+    var af = clamp(1 + m.age_weight * Math.log(1 + Math.max(0, days) / 365), m.age_band[0], m.age_band[1]);
+    return {
+      size: Math.max(1, Math.round(size)),
+      gf: gf,
+      af: af,
+      implied: Math.max(1, Math.round(size * gf * af))
+    };
   }
+  function clamp(v, lo, hi) { return Math.min(hi, Math.max(lo, v)); }
   var effectIndex = null;
   function effectOf(category) {
     if (!effectIndex) {
@@ -341,8 +350,7 @@
   // ── the model panel ────────────────────────────────────────────────────────
   function methodView() {
     var c = D.coefficients;
-    var growthSign = c.growth < 0 ? '−' : '+';
-    var ageSign = c.age < 0 ? '−' : '+';
+    var m = D.multipliers;
     return el('section', null,
       el('div', { class: 'lede', style: 'padding-top:34px' },
         el('div', null,
@@ -356,23 +364,25 @@
           stat('Comparables', String(D.comparables), 'token-bearing, TVL > 0'),
           stat('R²', String(D.r_squared), 'of log market cap'),
           stat('Size elasticity', c.logTvl.toFixed(3), 'ln TVL coefficient'),
-          stat('Growth per point', c.growth.toFixed(5), 'weekly, clipped ±' + D.model.growth_clip)
+          stat('Growth per point', (m.growth_weight * 100).toFixed(1) + '%', 'of value, per pp a week')
         )
       ),
       el('div', { class: 'note', style: 'grid-template-columns:1fr 1.15fr' },
         el('div', null,
-          el('h2', { text: 'The equation' }),
-          el('p', null, 'Implied value is the market cap the fit predicts for a protocol of this size, this growth, this age and this category. Age is the time since DefiLlama first listed it, the best record the snapshot carries of how long a protocol has run with no token; an undated protocol is scored at ' + D.model.unknown_age_days + ' days.'),
-          el('p', null, 'Growth is clipped at ±' + D.model.growth_clip + '% a week, where the snapshot\'s own outliers stop carrying information. A category\'s effect is the median residual of its comparables, shrunk toward the market\'s own level by how few of them there are, so a category with one comparable nudges its rows and a category with a dozen moves them.'),
+          el('h2', { text: 'What is measured, and what is assumed' }),
+          el('p', null, 'The fit measures one thing well: size. Over the ' + D.comparables + ' comparables, the ln TVL coefficient is the only estimate that clears two standard errors (t = 5.5); weekly growth (t = −1.6) and age (t = −0.4) do not. Fitting them anyway gave growth a negative sign, so a protocol growing faster was valued lower — the wrong direction for a launch radar. They are therefore not fitted.'),
+          el('p', null, 'Instead growth and age enter as multipliers that cannot invert: +1pp a week lifts the value by ' + (m.growth_weight * 100).toFixed(1) + '%, and each year of running with no token lifts it by ' + (m.age_weight * 100).toFixed(0) + '% of a log year. Both are clamped — growth to ' + m.growth_band[0] + '×–' + m.growth_band[1] + '×, age to ' + m.age_band[0] + '×–' + m.age_band[1] + '× — so one parabolic week cannot outrank a protocol five times its size. Every row on the board shows its own size-only value and the two multipliers it was moved by, so the reader can separate the measurement from the assumption.'),
+          el('p', null, 'A category\'s effect is the median residual of its comparables, shrunk toward the market\'s own level by how few of them there are, so a category with one comparable nudges its rows and a category with a dozen moves them. Age is the time since DefiLlama first listed the protocol, the best record the snapshot carries of how long it has run with no token; an undated protocol is scored at ' + D.model.unknown_age_days + ' days.'),
           el('p', null, 'The board ranks only pre-token protocols. Token-bearing ones are shown apart, at the market\'s own value, because ranking a fact against an estimate would tell a reader nothing.')
         ),
         el('div', null,
           el('div', { class: 'formula' },
-            'ln(market cap) = ' + c.intercept.toFixed(3) +
-            '\n              ' + (c.logTvl < 0 ? '− ' : '+ ') + Math.abs(c.logTvl).toFixed(3) + ' · ln(TVL)' +
-            '\n              ' + growthSign + ' ' + Math.abs(c.growth).toFixed(5) + ' · growth (pp/week, clipped ±' + D.model.growth_clip + ')' +
-            '\n              ' + ageSign + ' ' + Math.abs(c.age).toFixed(3) + ' · ln(age in days)' +
-            '\n              + category effect'
+            'size      = exp(' + c.intercept.toFixed(3) +
+            '\n                   ' + (c.logTvl < 0 ? '− ' : '+ ') + Math.abs(c.logTvl).toFixed(3) + ' · ln(TVL)' +
+            '\n                   + category effect)' +
+            '\n\nimplied   = size' +
+            '\n          × (1 + ' + m.growth_weight + ' · growth)      clamped ' + m.growth_band[0] + '–' + m.growth_band[1] +
+            '\n          × (1 + ' + m.age_weight + ' · ln(1 + years))  clamped ' + m.age_band[0] + '–' + m.age_band[1]
           ),
           el('div', { class: 'effects' },
             (D.categories || []).slice(0, 14).map(function (e) {
@@ -407,7 +417,7 @@
     writeHash();
 
     var predicted = recompute(row);
-    var agrees = predicted === row.implied_value_usd;
+    var agrees = predicted.implied === row.implied_value_usd;
     var c = D.coefficients;
     var growth = Math.min(D.model.growth_clip, Math.max(-D.model.growth_clip, row.change_7d === null ? 0 : row.change_7d));
     var days = row.age_days === null ? D.model.unknown_age_days : row.age_days;
@@ -437,13 +447,16 @@
 
     body.appendChild(el('h3', { text: 'How the model got there' }));
     body.appendChild(el('p', { style: 'color:var(--ink-soft);line-height:1.6' },
-      'ln(cap) = ' + c.intercept.toFixed(3) + ' ' + (c.logTvl < 0 ? '−' : '+') + ' ' + Math.abs(c.logTvl).toFixed(3) + '·ln(' + money(row.tvl_usd) + ') ' +
-      (c.growth < 0 ? '−' : '+') + ' ' + Math.abs(c.growth).toFixed(5) + '·(' + growth.toFixed(1) + 'pp) ' +
-      (c.age < 0 ? '−' : '+') + ' ' + Math.abs(c.age).toFixed(3) + '·ln(' + Math.round(days) + 'd) ' +
-      (effect >= 0 ? '+ ' : '− ') + Math.abs(effect).toFixed(2) + ' (' + (row.category || 'Uncategorised') + ', n=' + (catRow ? catRow.comparables : 0) + ')'
+      'Measured: size = exp(' + c.intercept.toFixed(3) + ' ' + (c.logTvl < 0 ? '−' : '+') + ' ' + Math.abs(c.logTvl).toFixed(3) + '·ln(' + money(row.tvl_usd) + ') ' +
+      (effect >= 0 ? '+ ' : '− ') + Math.abs(effect).toFixed(2) + ' (' + (row.category || 'Uncategorised') + ', n=' + (catRow ? catRow.comparables : 0) + ')) = ' + money(predicted.size)
+    ));
+    body.appendChild(el('p', { style: 'color:var(--ink-soft);line-height:1.6;margin-top:6px' },
+      'Assumed: growth ' + growth.toFixed(1) + 'pp → ×' + predicted.gf.toFixed(3) + ', age ' + age(row.age_days) + ' → ×' + predicted.af.toFixed(3) +
+      ', both clamped so neither can invert the ranking by size.'
     ));
     body.appendChild(el('p', { style: 'margin-top:10px;font-family:var(--mono);font-size:11px;color:var(--ink-faint)' },
-      'The page recomputes this row as ' + money(predicted) + (agrees ? ', the same number board.json carries.' : ', which differs from the board: the data would be stale.') + ' It is an estimate, not a price, and it is not advice.'
+      money(predicted.size) + ' × ' + predicted.gf.toFixed(3) + ' × ' + predicted.af.toFixed(3) + ' = ' + money(predicted.implied) +
+      (agrees ? ', the same number board.json carries.' : ', which differs from the board: the data would be stale.') + ' An estimate, not a price, and not advice.'
     ));
 
     body.appendChild(el('h3', { text: 'How to farm it' }));

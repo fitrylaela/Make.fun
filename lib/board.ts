@@ -16,15 +16,24 @@ import type {
   Snapshot,
   SnapshotProtocol,
 } from './types.ts';
-import { ageDays, clippedGrowth, fitValuation, hasToken, isComparable } from './valuation.ts';
+import {
+  AGE_FACTOR_BAND,
+  AGE_WEIGHT,
+  GROWTH_FACTOR_BAND,
+  GROWTH_WEIGHT,
+  ageDays,
+  fitValuation,
+  hasToken,
+  isComparable,
+} from './valuation.ts';
 
-export const MODEL_VERSION = 'comps-1';
+export const MODEL_VERSION = 'comps-2';
 
 export const MODEL: ModelConstants = {
   floor_usd: 50_000_000,
   growth_clip: 50,
   unknown_age_days: 365,
-  category_shrink: 4,
+  category_shrink: 20,
   early_rows: 200,
 };
 
@@ -213,6 +222,9 @@ export function buildBoard(snapshot: Snapshot, constants: ModelConstants = MODEL
     value_per_tvl: Math.round((score.implied / p.tvl_usd) * 1e4) / 1e4,
     comparables: score.comparables,
     category_effect: Math.round(score.categoryEffect * 1e3) / 1e3,
+    size_only_usd: score.sizeOnly,
+    growth_factor: Math.round(score.growthFactor * 1e4) / 1e4,
+    age_factor: Math.round(score.ageFactor * 1e4) / 1e4,
     farm_steps: farmSteps(p, ageDays(snapshot.as_of, p.listed_at)).map(stepText),
   }));
 }
@@ -274,6 +286,9 @@ function radarRow(row: BoardRow): RadarRow {
     implied_value_usd: row.implied_value_usd,
     value_per_tvl: row.value_per_tvl,
     comparables: row.comparables,
+    size_only_usd: row.size_only_usd,
+    growth_factor: row.growth_factor,
+    age_factor: row.age_factor,
     farm_steps: row.farm_steps,
   };
 }
@@ -292,8 +307,12 @@ export function buildRadar(snapshot: Snapshot, constants: ModelConstants = MODEL
     coefficients: {
       intercept: Math.round(valuation.coefficients.intercept * 1e4) / 1e4,
       logTvl: Math.round(valuation.coefficients.logTvl * 1e4) / 1e4,
-      growth: Math.round(valuation.coefficients.growth * 1e5) / 1e5,
-      age: Math.round(valuation.coefficients.age * 1e4) / 1e4,
+    },
+    multipliers: {
+      growth_weight: GROWTH_WEIGHT,
+      age_weight: AGE_WEIGHT,
+      growth_band: [GROWTH_FACTOR_BAND[0], GROWTH_FACTOR_BAND[1]],
+      age_band: [AGE_FACTOR_BAND[0], AGE_FACTOR_BAND[1]],
     },
     r_squared: Math.round(valuation.rSquared * 1e3) / 1e3,
     comparables: valuation.comparables,

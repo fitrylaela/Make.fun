@@ -79,6 +79,10 @@ export interface RadarRow {
   implied_value_usd: number;
   value_per_tvl: number;
   comparables: number;
+  /** The size-only estimate: the market cap the fit predicts before growth and age are applied. */
+  size_only_usd: number;
+  growth_factor: number;
+  age_factor: number;
   farm_steps: string[];
 }
 
@@ -107,7 +111,14 @@ export interface RadarData {
   source: string;
   model: ModelConstants;
   model_version: string;
-  coefficients: { intercept: number; logTvl: number; growth: number; age: number };
+  coefficients: { intercept: number; logTvl: number };
+  /** The multipliers growth and age enter by, as assumptions the page states openly. */
+  multipliers: {
+    growth_weight: number;
+    age_weight: number;
+    growth_band: [number, number];
+    age_band: [number, number];
+  };
   r_squared: number;
   comparables: number;
   categories: CategoryEffect[];
