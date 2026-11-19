@@ -8,7 +8,7 @@
   --card:       #fbf8f1;
   --ink:        #191712;
   --ink-soft:   #4a453a;
-  --ink-faint:  #8a8371;
+  --ink-faint:  #736c59;   /* 4.56:1 on paper, 4.93:1 on card: the smallest text still clears AA */
   --rule:       #d6cdb9;
   --rule-soft:  #e3dbcb;
   --signal:     #0b6b52;   /* the one accent: a deep bottle green */
@@ -76,19 +76,19 @@ button { font: inherit; color: inherit; cursor: pointer; background: none; borde
 .pip { width: 9px; height: 9px; border-radius: 50%; background: var(--signal); align-self: center; box-shadow: 0 0 0 3px rgba(11,107,82,.14); }
 .wordmark { font-family: var(--serif); font-size: 23px; font-weight: 700; letter-spacing: -0.03em; }
 .mast-tag {
-  font-family: var(--mono); font-size: 10px; letter-spacing: .16em; text-transform: uppercase;
+  font-family: var(--mono); font-size: 12px; letter-spacing: .16em; text-transform: uppercase;
   color: var(--ink-faint); padding-left: 10px; border-left: 1px solid var(--rule);
 }
 .mast-nav { display: flex; gap: 2px; margin-left: auto; }
 .mast-nav button {
-  font-family: var(--mono); font-size: 10.5px; letter-spacing: .12em; text-transform: uppercase;
+  font-family: var(--mono); font-size: 12px; letter-spacing: .12em; text-transform: uppercase;
   padding: 7px 13px; border-radius: 999px; color: var(--ink-soft);
   border: 1px solid transparent; transition: background .15s, color .15s, border-color .15s;
 }
 .mast-nav button:hover { background: var(--paper-deep); color: var(--ink); }
 .mast-nav button[aria-selected="true"] { background: var(--ink); color: var(--paper); border-color: var(--ink); }
 .mast-meta {
-  font-family: var(--mono); font-size: 10.5px; letter-spacing: .06em; color: var(--ink-faint);
+  font-family: var(--mono); font-size: 12px; letter-spacing: .06em; color: var(--ink-faint);
   display: flex; gap: 14px; flex-wrap: wrap;
 }
 .mast-meta b { color: var(--ink-soft); font-weight: 500; }
@@ -103,7 +103,7 @@ button { font: inherit; color: inherit; cursor: pointer; background: none; borde
   padding: 30px 0 22px; border-bottom: 1px solid var(--rule);
 }
 .kicker {
-  font-family: var(--mono); font-size: 10.5px; letter-spacing: .2em; text-transform: uppercase;
+  font-family: var(--mono); font-size: 12px; letter-spacing: .2em; text-transform: uppercase;
   color: var(--signal); margin-bottom: 14px; display: flex; align-items: center; gap: 8px;
 }
 .kicker::before { content: ""; width: 22px; height: 1px; background: var(--signal); }
@@ -114,9 +114,9 @@ button { font: inherit; color: inherit; cursor: pointer; background: none; borde
 
 .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: var(--rule); border: 1px solid var(--rule); }
 .stat { background: var(--card); padding: 11px 14px; }
-.stat .k { font-family: var(--mono); font-size: 9.5px; letter-spacing: .13em; text-transform: uppercase; color: var(--ink-faint); }
+.stat .k { font-family: var(--mono); font-size: 12px; letter-spacing: .13em; text-transform: uppercase; color: var(--ink-faint); }
 .stat .v { font-family: var(--serif); font-size: 23px; line-height: 1.1; font-weight: 600; margin-top: 4px; letter-spacing: -.02em; }
-.stat .v small { font-family: var(--mono); font-size: 11px; color: var(--ink-faint); font-weight: 400; letter-spacing: 0; }
+.stat .v small { font-family: var(--mono); font-size: 12px; color: var(--ink-faint); font-weight: 400; letter-spacing: 0; }
 
 /* ── toolbar ──────────────────────────────────────────────────────────────── */
 
@@ -134,25 +134,25 @@ button { font: inherit; color: inherit; cursor: pointer; background: none; borde
 .search svg { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); opacity: .45; }
 .chips { display: flex; gap: 5px; flex-wrap: wrap; }
 .chip {
-  font-family: var(--mono); font-size: 10px; letter-spacing: .07em; text-transform: uppercase;
+  font-family: var(--mono); font-size: 12px; letter-spacing: .07em; text-transform: uppercase;
   padding: 6px 11px; border: 1px solid var(--rule); border-radius: 999px; color: var(--ink-soft);
   background: var(--card); transition: all .14s;
 }
 .chip:hover { border-color: var(--ink-soft); color: var(--ink); }
 .chip[aria-pressed="true"] { background: var(--signal); border-color: var(--signal); color: #f6f2e8; }
-.toolbar .count { margin-left: auto; font-family: var(--mono); font-size: 11px; color: var(--ink-faint); letter-spacing: .04em; }
+.toolbar .count { margin-left: auto; font-family: var(--mono); font-size: 12px; color: var(--ink-faint); letter-spacing: .04em; }
 
 /* ── board ────────────────────────────────────────────────────────────────── */
 
 .board { margin-top: var(--s4); }
 .board-head, .row {
   display: grid;
-  grid-template-columns: 54px minmax(0, 2.35fr) 96px 84px 72px minmax(150px, 1.1fr) 78px;
+  grid-template-columns: 54px minmax(0, 2.6fr) 96px 84px 72px minmax(160px, 1.15fr);
   gap: var(--s4); align-items: center;
 }
 .board-head {
   padding: 9px var(--s3); border-bottom: 1px solid var(--ink);
-  font-family: var(--mono); font-size: 9.5px; letter-spacing: .13em; text-transform: uppercase; color: var(--ink-faint);
+  font-family: var(--mono); font-size: 12px; letter-spacing: .13em; text-transform: uppercase; color: var(--ink-faint);
 }
 .board-head button { color: inherit; letter-spacing: inherit; font-size: inherit; font-family: inherit; text-transform: inherit; padding: 0; text-align: left; }
 .board-head button:hover { color: var(--ink); }
@@ -173,7 +173,7 @@ button { font: inherit; color: inherit; cursor: pointer; background: none; borde
 }
 .row.top .rank { color: var(--signal); }
 .row .who b { display: block; font-weight: 600; font-size: 14px; letter-spacing: -.005em; }
-.row .who span { display: block; font-size: 11.5px; color: var(--ink-faint); margin-top: 2px; }
+.row .who span { display: block; font-size: 12px; color: var(--ink-faint); margin-top: 2px; }
 .row .num { font-family: var(--mono); font-size: 12px; font-variant-numeric: tabular-nums; text-align: right; }
 .row .num.pos { color: var(--signal); }
 .row .num.neg { color: var(--warn); }
@@ -183,7 +183,7 @@ button { font: inherit; color: inherit; cursor: pointer; background: none; borde
 .meter { flex: 1; max-width: 82px; height: 5px; background: var(--rule-soft); border-radius: 999px; overflow: hidden; }
 .meter i { display: block; height: 100%; background: linear-gradient(90deg, var(--signal), #2f9c76); border-radius: 999px; }
 .badge {
-  font-family: var(--mono); font-size: 9px; letter-spacing: .1em; text-transform: uppercase;
+  font-family: var(--mono); font-size: 12px; letter-spacing: .1em; text-transform: uppercase;
   color: var(--signal-ink); border: 1px solid rgba(11,107,82,.32); background: rgba(11,107,82,.06);
   padding: 3px 7px; border-radius: var(--r1); text-align: center; white-space: nowrap;
 }
@@ -203,7 +203,7 @@ button { font: inherit; color: inherit; cursor: pointer; background: none; borde
 .note p { color: var(--ink-soft); max-width: 52ch; }
 .note p + p { margin-top: 10px; }
 .formula {
-  font-family: var(--mono); font-size: 11.5px; line-height: 1.85; color: var(--ink);
+  font-family: var(--mono); font-size: 12px; line-height: 1.85; color: var(--ink);
   background: var(--card); border: 1px solid var(--rule); border-left: 3px solid var(--signal);
   padding: 14px 16px; border-radius: var(--r1); white-space: pre-wrap; word-break: break-word;
 }
@@ -217,7 +217,7 @@ button { font: inherit; color: inherit; cursor: pointer; background: none; borde
 .effect .e { font-family: var(--mono); text-align: right; font-variant-numeric: tabular-nums; }
 .effect .e.pos { color: var(--signal); }
 .effect .e.neg { color: var(--warn); }
-.effect .c { font-family: var(--mono); font-size: 10px; color: var(--ink-faint); text-align: right; }
+.effect .c { font-family: var(--mono); font-size: 12px; color: var(--ink-faint); text-align: right; }
 
 /* ── detail sheet ─────────────────────────────────────────────────────────── */
 
@@ -232,12 +232,12 @@ button { font: inherit; color: inherit; cursor: pointer; background: none; borde
   display: flex; align-items: flex-start; gap: var(--s4);
   padding: var(--s5) var(--s6) var(--s4); border-bottom: 1px solid var(--ink);
 }
-.sheet-head .rankline { font-family: var(--mono); font-size: 10px; letter-spacing: .14em; text-transform: uppercase; color: var(--signal); }
+.sheet-head .rankline { font-family: var(--mono); font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--signal); }
 .sheet-head h2 { font-size: 30px; line-height: 1.08; margin-top: 6px; }
 .sheet-head .sub { color: var(--ink-faint); font-size: 12.5px; margin-top: 4px; }
 .sheet-close {
   margin-left: auto; border: 1px solid var(--rule); border-radius: 999px; padding: 6px 13px;
-  font-family: var(--mono); font-size: 10px; letter-spacing: .1em; text-transform: uppercase;
+  font-family: var(--mono); font-size: 12px; letter-spacing: .1em; text-transform: uppercase;
   background: var(--paper); flex: none;
 }
 .sheet-close:hover { border-color: var(--ink); }
@@ -245,12 +245,12 @@ button { font: inherit; color: inherit; cursor: pointer; background: none; borde
 
 .equation { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; background: var(--rule); border: 1px solid var(--rule); margin-bottom: var(--s5); }
 .equation div { background: var(--paper); padding: 12px 14px; }
-.equation span { display: block; font-family: var(--mono); font-size: 9.5px; letter-spacing: .11em; text-transform: uppercase; color: var(--ink-faint); }
+.equation span { display: block; font-family: var(--mono); font-size: 12px; letter-spacing: .11em; text-transform: uppercase; color: var(--ink-faint); }
 .equation b { display: block; font-family: var(--mono); font-size: 15px; font-weight: 500; margin-top: 4px; font-variant-numeric: tabular-nums; }
 .equation b.big { font-family: var(--serif); font-size: 23px; color: var(--signal-ink); letter-spacing: -.02em; }
 
 .sheet h3 {
-  font-family: var(--mono); font-size: 10px; letter-spacing: .16em; text-transform: uppercase;
+  font-family: var(--mono); font-size: 12px; letter-spacing: .16em; text-transform: uppercase;
   color: var(--ink-faint); padding-bottom: 7px; border-bottom: 1px solid var(--rule); margin: var(--s5) 0 var(--s3);
 }
 .steps { margin: 0; padding: 0; list-style: none; counter-reset: step; }
@@ -260,7 +260,7 @@ button { font: inherit; color: inherit; cursor: pointer; background: none; borde
 .steps li::before {
   content: counter(step, decimal-leading-zero);
   position: absolute; left: 0; top: 1px;
-  font-family: var(--mono); font-size: 11px; color: var(--signal);
+  font-family: var(--mono); font-size: 12px; color: var(--signal);
   border: 1px solid rgba(11,107,82,.28); background: rgba(11,107,82,.05);
   width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center;
 }
@@ -269,7 +269,7 @@ button { font: inherit; color: inherit; cursor: pointer; background: none; borde
 }
 .steps li:last-child::after { display: none; }
 .steps .act { display: block; line-height: 1.55; }
-.steps .meta { display: block; margin-top: 5px; font-family: var(--mono); font-size: 10.5px; color: var(--ink-faint); }
+.steps .meta { display: block; margin-top: 5px; font-family: var(--mono); font-size: 12px; color: var(--ink-faint); }
 .steps .meta em { font-style: normal; color: var(--ink-soft); }
 
 /* ── responsive ───────────────────────────────────────────────────────────── */
@@ -278,7 +278,7 @@ button { font: inherit; color: inherit; cursor: pointer; background: none; borde
   .masthead, #main { padding-left: var(--s5); padding-right: var(--s5); }
   .lede { grid-template-columns: 1fr; gap: var(--s6); }
   .note { grid-template-columns: 1fr; gap: var(--s5); }
-  .board-head, .row { grid-template-columns: 44px minmax(0,2fr) 86px 74px minmax(120px,1fr) 70px; }
+  .board-head, .row { grid-template-columns: 44px minmax(0,2.2fr) 86px 74px minmax(120px,1fr); }
   .board-head .h-age, .row .c-age { display: none; }
 }
 @media (max-width: 760px) {
@@ -286,7 +286,7 @@ button { font: inherit; color: inherit; cursor: pointer; background: none; borde
   .mast-meta { display: none; }
   .board-head { display: none; }
   .row { grid-template-columns: 40px minmax(0,1fr) minmax(110px,.9fr); }
-  .row .c-tvl, .row .c-grow, .row .badge { display: none; }
+  .row .c-tvl, .row .c-grow { display: none; }
   .equation { grid-template-columns: 1fr 1fr; }
   .sheet-head, .sheet-body { padding-left: var(--s4); padding-right: var(--s4); }
 }

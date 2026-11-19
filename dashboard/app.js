@@ -253,8 +253,7 @@
       headCell('TVL', 'tvl', 'r'),
       headCell('7d', 'growth', 'r'),
       headCell('Age', 'age', 'r h-age'),
-      headCell('Implied value', 'implied', 'r'),
-      el('div', { class: 'r', text: 'Status' })
+      headCell('Implied value', 'implied', 'r')
     );
   }
   function board() {
@@ -292,8 +291,7 @@
           el('span', { class: 'meter', 'aria-hidden': 'true' },
             el('i', { style: 'width:' + Math.max(4, Math.round((r.implied_value_usd / max) * 100)) + '%' })
           )
-        ),
-        el('div', { class: 'badge', text: 'no token' })
+        )
       );
       body.appendChild(row);
     });
@@ -454,7 +452,7 @@
       'Assumed: growth ' + growth.toFixed(1) + 'pp → ×' + predicted.gf.toFixed(3) + ', age ' + age(row.age_days) + ' → ×' + predicted.af.toFixed(3) +
       ', both clamped so neither can invert the ranking by size.'
     ));
-    body.appendChild(el('p', { style: 'margin-top:10px;font-family:var(--mono);font-size:11px;color:var(--ink-faint)' },
+    body.appendChild(el('p', { style: 'margin-top:10px;font-family:var(--mono);font-size:12px;color:var(--ink-faint)' },
       money(predicted.size) + ' × ' + predicted.gf.toFixed(3) + ' × ' + predicted.af.toFixed(3) + ' = ' + money(predicted.implied) +
       (agrees ? ', the same number board.json carries.' : ', which differs from the board: the data would be stale.') + ' An estimate, not a price, and not advice.'
     ));
