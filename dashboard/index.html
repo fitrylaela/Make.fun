@@ -52,11 +52,11 @@
 </section>
 
 <section class="controls" aria-label="Filter the board">
-  <div class="tabs" role="tablist" aria-label="Token status">
-    <button role="tab" id="tab-pre" aria-selected="true" aria-controls="board" class="tab">Pre-token <span class="tab-count" id="count-pre"></span></button>
-    <button role="tab" id="tab-live" aria-selected="false" aria-controls="board" class="tab">Live tokens <span class="tab-count" id="count-live"></span></button>
-  </div>
   <div class="fields">
+    <div class="tabs" role="tablist" aria-label="Token status">
+      <button role="tab" id="tab-pre" aria-selected="true" aria-controls="board" class="tab">Pre-token <span class="tab-count" id="count-pre"></span></button>
+      <button role="tab" id="tab-live" aria-selected="false" aria-controls="board" class="tab">Live <span class="tab-count" id="count-live"></span></button>
+    </div>
     <label class="field">
       <span>Search</span>
       <input id="q" type="search" placeholder="protocol, chain or category" autocomplete="off">
@@ -80,10 +80,10 @@
         <option value="name">Name</option>
       </select>
     </label>
-  </div>
-  <div class="result-line">
-    <span id="result-count">–</span>
-    <button class="link-btn" id="reset">Reset filters</button>
+    <div class="result-line">
+      <span id="result-count">–</span>
+      <button class="link-btn" id="reset">Reset</button>
+    </div>
   </div>
 </section>
 
