@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Token Radar: what a pre-token protocol's launch would be worth</title>
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<a class="skip" href="#board">Skip to the board</a>
+
+<header class="masthead">
+  <div class="mast-top">
+    <div class="brand">
+      <span class="mark" aria-hidden="true"></span>
+      <span class="wordmark">Token&nbsp;Radar</span>
+      <span class="pill" id="as-of">snapshot</span>
+      <span class="pill quiet" id="model-version">model</span>
+    </div>
+    <div class="stats" aria-label="The radar at a glance">
+      <div class="stat"><b id="stat-watchlist">–</b><span>watchlist</span></div>
+      <div class="stat"><b id="stat-rows">–</b><span>ranked</span></div>
+      <div class="stat"><b id="stat-early">–</b><span>early finds</span></div>
+      <div class="stat"><b id="stat-live">–</b><span>live tokens set aside</span></div>
+    </div>
+  </div>
+  <h1>What a protocol with no token would be worth if it launched today</h1>
+  <p class="lede">
+    <b>129 of the snapshot's 758 protocols already trade</b>, so the market has priced them against
+    their TVL. This radar reads those ratios as the evidence, applies each protocol's own category
+    multiple to the ones still waiting, and ranks them by what that implies. Every row carries the
+    steps to farm it before the token exists.
+  </p>
+  <p class="formula" aria-label="The model in one line">
+    <span class="f-term">TVL</span><span class="f-op">×</span>
+    <span class="f-term accent">category multiple</span><span class="f-op">×</span>
+    <span class="f-term">growth</span><span class="f-op">×</span>
+    <span class="f-term">patience</span><span class="f-op">=</span>
+    <span class="f-term result">implied value</span>
+    <button class="link-btn" id="peers-toggle" aria-expanded="false" aria-controls="peers-panel">the peer multiples behind it</button>
+  </p>
+</header>
+
+<section id="peers-panel" class="peers" hidden aria-label="Category multiples">
+  <table class="peer-table">
+    <caption>The market's own multiples, market cap over TVL, by category. A category with fewer than <span id="m-minpeers">4</span> token-bearing protocols borrows the all-category median, and its rows say so.</caption>
+    <thead>
+      <tr><th scope="col">Category</th><th scope="col" class="num">Protocols</th><th scope="col" class="num">Median multiple</th><th scope="col">Source</th></tr>
+    </thead>
+    <tbody id="peers-body"></tbody>
+  </table>
+</section>
+
+<section class="controls" aria-label="Filter the board">
+  <div class="tabs" role="tablist" aria-label="Token status">
+    <button role="tab" id="tab-pre" aria-selected="true" aria-controls="board" class="tab">Pre-token <span class="tab-count" id="count-pre"></span></button>
+    <button role="tab" id="tab-live" aria-selected="false" aria-controls="board" class="tab">Live tokens <span class="tab-count" id="count-live"></span></button>
+  </div>
+  <div class="fields">
+    <label class="field">
+      <span>Search</span>
+      <input id="q" type="search" placeholder="protocol, chain or category" autocomplete="off">
+    </label>
+    <label class="field">
+      <span>Category</span>
+      <select id="category"><option value="all">All categories</option></select>
+    </label>
+    <label class="field">
+      <span>Chain</span>
+      <select id="chain"><option value="all">All chains</option></select>
+    </label>
+    <label class="field">
+      <span>Sort by</span>
+      <select id="sort">
+        <option value="implied">Implied value</option>
+        <option value="tvl">TVL</option>
+        <option value="growth">7-day growth</option>
+        <option value="age">Time without a token</option>
+        <option value="multiple">Category multiple</option>
+        <option value="name">Name</option>
+      </select>
+    </label>
+  </div>
+  <div class="result-line">
+    <span id="result-count">–</span>
+    <button class="link-btn" id="reset">Reset filters</button>
+  </div>
+</section>
+
+<main id="board" tabindex="-1" aria-busy="true"></main>
+
+<aside id="detail" class="detail" hidden aria-live="polite"></aside>
+
+<footer class="colophon">
+  <p>
+    Implied value is this entry's own claim, not a promise and not advice: a protocol on the board may
+    already have a token its DefiLlama record does not carry. Figures are the snapshot's, read once
+    and never updated. Built for make.fun's token launch radar bounty.
+  </p>
+  <p class="colophon-note" id="colophon-source"></p>
+</footer>
+
+<script src="../data.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
