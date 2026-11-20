@@ -299,6 +299,17 @@
     return null;
   }
 
+  // The evidence line: which protocols the multiple came from, and what each is priced at.
+  function peerNote(row) {
+    var peers = row.peers || [];
+    if (peers.length === 0) return 'no token-bearing peer, so the all-category median';
+    var shown = peers.slice(0, 3).map(function (p) { return p.name + ' ×' + p.ratio.toFixed(2); }).join(', ');
+    if (row.peer_count < DATA.model.min_peers) {
+      return 'only ' + row.peer_count + ' peer' + (row.peer_count === 1 ? '' : 's') + ' (' + shown + '), blended with the all-category median and held within ×' + DATA.model.thin_band + ' of it';
+    }
+    return 'median of ' + row.peer_count + ' token-bearing peers: ' + shown;
+  }
+
   function wline(k, sub, v, total) {
     return el('div', { class: 'wline' + (total ? ' total' : '') },
       el('div', { class: 'k' }, el('span', { text: k }), sub ? el('small', { text: sub }) : null),
@@ -346,11 +357,22 @@
     if (pre !== null) {
       var workings = el('div', { class: 'workings' });
       workings.appendChild(wline('TVL', 'the snapshot’s figure for this protocol', fmtUsd(pre.tvl_usd)));
-      workings.appendChild(wline('Category multiple', (pre.peer_count < model.min_peers ? 'borrowed: only ' + pre.peer_count + ' peers in its category' : 'median of ' + pre.peer_count + ' token-bearing peers'), '×' + pre.multiple.toFixed(4)));
+      workings.appendChild(wline('Category multiple', peerNote(pre), '×' + pre.multiple.toFixed(4)));
       workings.appendChild(wline('Growth multiplier', '7-day change ' + fmtPct(pre.change_7d) + ', quarter weight', '×' + pre.growth_multiplier.toFixed(4)));
       workings.appendChild(wline('Patience multiplier', fmtAge(pre.age_days) + ' with no token, up to ×' + (1 + model.patience_weight).toFixed(2), '×' + pre.patience_multiplier.toFixed(4)));
       workings.appendChild(wline('Implied value', 'TVL × multiple × growth × patience', fmtUsd(rec), true));
       left.appendChild(workings);
+      if (pre.peers && pre.peers.length > 0) {
+        var ev = el('div', { class: 'evidence' });
+        ev.appendChild(el('h4', { text: 'The peers behind that multiple' }));
+        pre.peers.forEach(function (p) {
+          ev.appendChild(el('div', { class: 'ev-row' },
+            el('span', { class: 'ev-name', text: p.name }),
+            el('span', { class: 'ev-ratio', text: '×' + p.ratio.toFixed(2) })
+          ));
+        });
+        left.appendChild(ev);
+      }
     } else {
       var facts = el('div', { class: 'facts' });
       facts.appendChild(fact('TVL', fmtUsd(live.tvl_usd)));
@@ -433,14 +455,14 @@
     var chain = chainOf(p);
     var capital = capitalFor(p);
     var hold = holdDaysFor(p.age_days);
-    var upside = Math.round(p.tvl_usd * p.multiple);
+    var upside = fmtUsd(Math.round(p.tvl_usd * p.multiple));
     return [
       'Use a fresh wallet funded only for this farm, keep the seed phrase offline, and note the date the position opens. Cost: under $3 of gas. Time: 5 minutes.',
       actionFor(p, capital, chain) + ' Cost: $' + capital + ' of capital and about $' + (capital >= 250 ? 10 : 5) + ' of gas. Time: 15 minutes to set up.',
       'Make one qualifying action a week on ' + chain + ': a deposit, a borrow, a swap or a governance vote. Cost: about $2 of gas a week. Time: 10 minutes a week.',
       'Hold for at least ' + hold + ' days so the activity lands in more than one snapshot, and do not move the funds mid-window. Cost: the $' + capital + ' stays in the position. Time: ' + hold + ' days.',
       "Check " + p.name + "'s own docs and governance forum monthly for a points or airdrop programme, and claim only from a link the protocol publishes. Cost: no fee to check, and never pay to claim. Time: 10 minutes a month.",
-      'Log the wallet, the dates and every transaction, and compare the position with the $' + upside + " the category's multiple implies before you add more. Cost: nothing but the log. Time: 5 minutes."
+      'Log the wallet, the dates and every transaction, and compare the position with the ' + upside + " the category's multiple implies before you add more. Cost: nothing but the log. Time: 5 minutes."
     ];
   }
 

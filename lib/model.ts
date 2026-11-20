@@ -47,6 +47,12 @@ export interface ModelConstants {
   ratio_cap: number;
   /** Below this many peers a category borrows the all-category median. */
   min_peers: number;
+  /** Credibility weight: a category's own median is blended toward the all-category median by
+   *  n/(n+K), so one lucky peer cannot set a whole category's multiple. */
+  credibility: number;
+  /** A thin category's blended multiple is clamped to this band around the all-category median,
+   *  so one peer worth 10x cannot value a whole category at 10x. */
+  thin_band: number;
   growth_weight: number;
   growth_floor: number;
   growth_cap: number;
@@ -63,6 +69,8 @@ export const MODEL: ModelConstants = {
   ratio_floor: 0.02,
   ratio_cap: 4,
   min_peers: 4,
+  credibility: 3,
+  thin_band: 1.5,
   growth_weight: 0.25,
   growth_floor: -60,
   growth_cap: 120,
@@ -100,6 +108,7 @@ export interface BoardRow {
     multiple: number;
     peer_count: number;
     peer_median: number;
+    peers: { name: string; ratio: number }[];
     growth_pct: number;
     growth_multiplier: number;
     patience_multiplier: number;
@@ -123,6 +132,7 @@ export interface RadarRow {
   multiple: number;
   peer_count: number;
   peer_median: number;
+  peers: { name: string; ratio: number }[];
   growth_multiplier: number;
   patience_multiplier: number;
 }
@@ -203,38 +213,64 @@ export function median(values: number[]): number {
  * The market's own multiples, by category: for every protocol that already trades, its market cap
  * over its TVL, kept only where both figures are real and the ratio is not an artefact.
  */
-export function peerGroups(protocols: SnapshotProtocol[], model: ModelConstants): { groups: Map<string, number[]>; all: number[] } {
-  const groups = new Map<string, number[]>();
-  const all: number[] = [];
+export interface Peer {
+  name: string;
+  ratio: number;
+  tvl_usd: number;
+}
+
+export function peerGroups(protocols: SnapshotProtocol[], model: ModelConstants): { groups: Map<string, Peer[]>; all: Peer[] } {
+  const groups = new Map<string, Peer[]>();
+  const all: Peer[] = [];
   for (const p of protocols) {
     if (p.mcap_usd === null || p.tvl_usd <= 0 || p.category === 'CEX') continue;
     const ratio = p.mcap_usd / p.tvl_usd;
     if (!Number.isFinite(ratio) || ratio < model.ratio_floor || ratio > model.ratio_cap) continue;
-    all.push(ratio);
+    const peer: Peer = { name: p.name, ratio: round4(ratio), tvl_usd: p.tvl_usd };
+    all.push(peer);
     const key = p.category ?? '';
     const list = groups.get(key);
-    if (list === undefined) groups.set(key, [ratio]);
-    else list.push(ratio);
+    if (list === undefined) groups.set(key, [peer]);
+    else list.push(peer);
   }
   return { groups, all };
 }
 
-/** The multiple a pre-token protocol is valued at, and where that multiple came from. */
-export function multipleFor(p: SnapshotProtocol, groups: Map<string, number[]>, all: number[], model: ModelConstants): { multiple: number; peers: number; median: number; borrowed: boolean } {
+/** The peers behind a multiple, largest first: the evidence a reader can check. */
+export function peerEvidence(own: Peer[], all: Peer[], limit: number): { name: string; ratio: number }[] {
+  const source = own.length > 0 ? own : all;
+  return [...source]
+    .sort((a, b) => b.tvl_usd - a.tvl_usd)
+    .slice(0, limit)
+    .map((p) => ({ name: p.name, ratio: p.ratio }));
+}
+
+/**
+ * The multiple a pre-token protocol is valued at, and where that multiple came from.
+ *
+ * A category's own median is pulled toward the all-category median by n/(n+K), so a handful of
+ * peers cannot set it as firmly as a dozen. A category with fewer than min_peers peers is held
+ * inside a band around the all-category median: its own median still moves the number, but one
+ * peer trading at ten times its TVL cannot value a whole category at ten times.
+ */
+export function multipleFor(p: SnapshotProtocol, groups: Map<string, Peer[]>, all: Peer[], model: ModelConstants): { multiple: number; peers: number; median: number; borrowed: boolean; own: Peer[] } {
   const key = p.category ?? '';
   const own = groups.get(key) ?? [];
-  if (own.length >= model.min_peers) {
-    const m = median(own);
-    return { multiple: m, peers: own.length, median: m, borrowed: false };
-  }
-  const m = median(all);
-  return { multiple: m, peers: own.length, median: m, borrowed: true };
+  const global = median(all.map((o) => o.ratio));
+  const n = own.length;
+  if (n === 0) return { multiple: global, peers: 0, median: global, borrowed: true, own };
+  const cat = median(own.map((o) => o.ratio));
+  const blended = (n * cat + model.credibility * global) / (n + model.credibility);
+  if (n >= model.min_peers) return { multiple: blended, peers: n, median: cat, borrowed: false, own };
+  const lo = global / model.thin_band;
+  const hi = global * model.thin_band;
+  return { multiple: Math.min(hi, Math.max(lo, blended)), peers: n, median: cat, borrowed: true, own };
 }
 
 /** The three multipliers and the implied value one protocol gets under `model`. */
-export function impliedValue(p: SnapshotProtocol, asOf: string, model: ModelConstants, groups: Map<string, number[]>, all: number[]) {
+export function impliedValue(p: SnapshotProtocol, asOf: string, model: ModelConstants, groups: Map<string, Peer[]>, all: Peer[]) {
   const age = ageDays(asOf, p.listed_at);
-  const { multiple, peers, median: peerMedian, borrowed } = multipleFor(p, groups, all, model);
+  const { multiple, peers, median: peerMedian, borrowed, own } = multipleFor(p, groups, all, model);
   const rawGrowth = finite(p.change_7d, 0);
   const growthPct = Math.min(model.growth_cap, Math.max(model.growth_floor, rawGrowth));
   const growthMult = 1 + (growthPct / 100) * model.growth_weight;
@@ -242,7 +278,7 @@ export function impliedValue(p: SnapshotProtocol, asOf: string, model: ModelCons
   const waited = Math.min(Math.max(ageForModel, 0), model.patience_days) / model.patience_days;
   const patienceMult = 1 + waited * model.patience_weight;
   const implied = Math.max(1, Math.round(p.tvl_usd * multiple * growthMult * patienceMult));
-  return { implied, growthPct, growthMult, patienceMult, age, multiple, peers, peerMedian, borrowed };
+  return { implied, growthPct, growthMult, patienceMult, age, multiple, peers, peerMedian, borrowed, own };
 }
 
 export function buildBoard(snapshot: Snapshot, model: ModelConstants = MODEL): BoardRow[] {
@@ -281,6 +317,7 @@ export function buildBoard(snapshot: Snapshot, model: ModelConstants = MODEL): B
       multiple: round4(s.multiple),
       peer_count: s.peers,
       peer_median: round4(s.peerMedian),
+      peers: peerEvidence(s.own, all, 4),
       growth_pct: s.growthPct,
       growth_multiplier: round4(s.growthMult),
       patience_multiplier: round4(s.patienceMult),
@@ -291,6 +328,15 @@ export function buildBoard(snapshot: Snapshot, model: ModelConstants = MODEL): B
 }
 
 const round4 = (n: number): number => Math.round(n * 1e4) / 1e4;
+
+/** A dollar figure in the short form the page uses, for text a reader scans. */
+function shortUsd(n: number): string {
+  const a = Math.abs(n);
+  if (a >= 1e9) return `$${(n / 1e9).toFixed(2)}B`;
+  if (a >= 1e6) return `$${(n / 1e6).toFixed(1)}M`;
+  if (a >= 1e3) return `$${Math.round(n / 1e3)}K`;
+  return `$${Math.round(n)}`;
+}
 
 export function stepText(step: FarmStep): string {
   let s = `${step.text} Cost: ${step.cost}. Time: ${step.time}.`;
@@ -347,7 +393,7 @@ export function farmSteps(p: SnapshotProtocol, age: number | null, multiple: num
   const capital = capitalFor(p);
   const hold = holdDaysFor(age);
   const action = actionFor(p, capital, chain);
-  const upside = Math.round(p.tvl_usd * multiple);
+  const upside = shortUsd(Math.round(p.tvl_usd * multiple));
   return [
     {
       text: `Use a fresh wallet funded only for this farm, keep the seed phrase offline, and note the date the position opens.`,
@@ -375,7 +421,7 @@ export function farmSteps(p: SnapshotProtocol, age: number | null, multiple: num
       time: '10 minutes a month',
     },
     {
-      text: `Log the wallet, the dates and every transaction, and compare the position with the $${upside} the category's multiple implies before you add more.`,
+      text: `Log the wallet, the dates and every transaction, and compare the position with the ${upside} the category's multiple implies before you add more.`,
       cost: 'nothing but the log',
       time: '5 minutes',
     },
@@ -415,6 +461,7 @@ export function radarRow(row: BoardRow): RadarRow {
     multiple: row.model.multiple,
     peer_count: row.model.peer_count,
     peer_median: row.model.peer_median,
+    peers: row.model.peers,
     growth_multiplier: row.model.growth_multiplier,
     patience_multiplier: row.model.patience_multiplier,
   };
@@ -428,10 +475,10 @@ export function buildRadar(snapshot: Snapshot, model: ModelConstants = MODEL): {
   const peers: PeerGroup[] = [...groups.entries()]
     .map(([category, list]) => {
       const enough = list.length >= model.min_peers;
-      return { category: category === '' ? 'no category' : category, peers: list.length, median: round4(median(list)), borrowed: !enough };
+      return { category: category === '' ? 'no category' : category, peers: list.length, median: round4(median(list.map((o) => o.ratio))), borrowed: !enough };
     })
     .sort((a, b) => b.peers - a.peers || a.category.localeCompare(b.category));
-  peers.push({ category: 'all categories', peers: all.length, median: round4(median(all)), borrowed: false });
+  peers.push({ category: 'all categories', peers: all.length, median: round4(median(all.map((o) => o.ratio))), borrowed: false });
   const radar: RadarData = {
     as_of: snapshot.as_of,
     source: snapshot.source,
