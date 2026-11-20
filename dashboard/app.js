@@ -433,36 +433,46 @@
     if (age < 365) return 60;
     return 45;
   }
+  // The plan the page shows is the derivation main.ts writes to board.json: category, chains, TVL
+  // and age decide the action, the capital, the hold and every cost and time. No name is special-cased.
   function actionFor(p, capital, chain) {
     var c = (p.category || '').toLowerCase();
     var name = p.name;
-    if (c.indexOf('lend') >= 0 || c.indexOf('cdp') >= 0 || c.indexOf('collateral') >= 0) return 'Supply $' + capital + ' of USDC to ' + name + ' on ' + chain + ' and keep the position open.';
-    if (c.indexOf('dex') >= 0 || c.indexOf('yield') >= 0 || c.indexOf('leveraged farm') >= 0) return 'Provide $' + capital + ' of liquidity to ' + name + "'s main pool on " + chain + ' and keep the position open.';
-    if (c.indexOf('bridge') >= 0) return 'Bridge $' + capital + ' of USDC to ' + chain + ' through ' + name + ' and use the bridged funds in its app.';
-    if (c.indexOf('staking') >= 0 || c.indexOf('restak') >= 0) return 'Stake $' + capital + " of the chain's staking asset through " + name + ' and keep the receipt.';
-    if (c.indexOf('perpetual') >= 0 || c.indexOf('derivative') >= 0 || c.indexOf('basis') >= 0) return 'Deposit $' + capital + ' of USDC as margin on ' + name + ' and open one small hedge.';
-    if (c.indexOf('prediction') >= 0) return 'Fund $' + capital + ' and place one market position on ' + name + '.';
-    if (c.indexOf('curator') >= 0 || c.indexOf('allocator') >= 0 || c.indexOf('manager') >= 0) return 'Deposit $' + capital + ' into a ' + name + ' vault on ' + chain + ' and keep the shares.';
-    if (c.indexOf('stable') >= 0) return 'Mint or deposit $' + capital + ' of the stable asset through ' + name + ' on ' + chain + '.';
-    if (c.indexOf('rwa') >= 0) return 'Mint $' + capital + " of the protocol's yield asset on " + chain + ' and hold it.';
-    if (c.indexOf('insurance') >= 0) return 'Buy $' + capital + ' of cover from ' + name + ' on ' + chain + ' and keep the policy.';
-    if (c.indexOf('index') >= 0) return 'Mint $' + capital + ' of the index through ' + name + ' on ' + chain + ' and hold the basket.';
-    if (c.indexOf('farm') >= 0 || c.indexOf('incentive') >= 0) return "Deposit $" + capital + " into " + name + "'s farm on " + chain + ' and keep it through a full epoch.';
-    return 'Deposit $' + capital + ' of USDC into ' + name + ' on ' + chain + ' and keep the position open.';
+    var lend = { text: 'Supply $' + capital + ' of USDC to ' + name + ' on ' + chain + ', then borrow $' + Math.round(capital * 0.3) + ' of a major asset against it so both the supply and the borrow count.', gas: 9, minutes: 20 };
+    if (c.indexOf('lend') >= 0 || c.indexOf('collateral') >= 0) return lend;
+    if (c.indexOf('cdp') >= 0) return { text: 'Open a ' + name + ' vault on ' + chain + ' with $' + capital + ' of collateral, mint the stablecoin against it, and keep the vault open.', gas: 12, minutes: 25 };
+    if (c.indexOf('dex') >= 0) return { text: "Provide $" + capital + ' of liquidity to ' + name + "'s deepest pool on " + chain + ', then make one swap through it so the position earns fees and volume.', gas: 11, minutes: 20 };
+    if (c.indexOf('leveraged farm') >= 0) return { text: 'Open one $' + capital + ' leveraged position on ' + name + ' at the lowest leverage it allows, on ' + chain + '.', gas: 14, minutes: 25 };
+    if (c.indexOf('yield') >= 0 || c.indexOf('aggregator') >= 0) return { text: 'Deposit $' + capital + " of USDC into " + name + "'s top vault on " + chain + ' and leave it through a full harvest cycle.', gas: 7, minutes: 15 };
+    if (c.indexOf('bridge') >= 0) return { text: 'Bridge $' + capital + ' of USDC from Ethereum to ' + chain + ' through ' + name + ', then use the bridged funds inside its own app.', gas: 13, minutes: 25 };
+    if (c.indexOf('staking') >= 0 || c.indexOf('restak') >= 0) return { text: "Stake $" + capital + " of " + chain + "'s native asset through " + name + ' and keep the liquid receipt token in the same wallet.', gas: 6, minutes: 15 };
+    if (c.indexOf('perpetual') >= 0 || c.indexOf('derivative') >= 0 || c.indexOf('basis') >= 0) return { text: 'Deposit $' + capital + ' of USDC as margin on ' + name + ', open one small hedge, and leave the margin in place.', gas: 10, minutes: 20 };
+    if (c.indexOf('prediction') >= 0) return { text: 'Fund $' + capital + ' on ' + name + ' and place one position on a market that resolves within the hold window.', gas: 8, minutes: 15 };
+    if (c.indexOf('curator') >= 0 || c.indexOf('allocator') >= 0 || c.indexOf('manager') >= 0) return { text: 'Deposit $' + capital + " into one of " + name + "'s curated vaults on " + chain + ' and keep the shares rather than the underlying.', gas: 8, minutes: 15 };
+    if (c.indexOf('stable') >= 0) return { text: 'Mint or deposit $' + capital + ' of the stable asset through ' + name + ' on ' + chain + ' and hold it through the window.', gas: 9, minutes: 20 };
+    if (c.indexOf('rwa') >= 0) return { text: "Mint $" + capital + " of " + name + "'s yield asset on " + chain + ', complete any allowlist step it requires, and hold it.', gas: 15, minutes: 30 };
+    if (c.indexOf('insurance') >= 0) return { text: 'Buy $' + capital + ' of cover from ' + name + ' on ' + chain + ' for a protocol you already use, and keep the policy active.', gas: 8, minutes: 15 };
+    if (c.indexOf('index') >= 0) return { text: 'Mint $' + capital + ' of the index through ' + name + ' on ' + chain + ' and hold the basket rather than the parts.', gas: 9, minutes: 20 };
+    if (c.indexOf('farm') >= 0 || c.indexOf('incentive') >= 0) return { text: 'Deposit $' + capital + " into " + name + "'s farm on " + chain + ' and keep it staked through a full reward epoch.', gas: 8, minutes: 15 };
+    if (c.indexOf('card') >= 0 || c.indexOf('payment') >= 0) return { text: 'Deposit $' + capital + ' into ' + name + ' on ' + chain + ', then make one small payment with its card or app to register real use.', gas: 5, minutes: 15 };
+    if (c.indexOf('privacy') >= 0) return { text: 'Move $' + capital + ' through ' + name + ' on ' + chain + ' once, and again in a later week so the activity spans two windows.', gas: 12, minutes: 20 };
+    return lend;
   }
 
   function farmSteps(p) {
     var chain = chainOf(p);
     var capital = capitalFor(p);
     var hold = holdDaysFor(p.age_days);
+    var action = actionFor(p, capital, chain);
     var upside = fmtUsd(Math.round(p.tvl_usd * p.multiple));
+    var chains = (p.chains || []).length > 1 ? ' It runs on ' + p.chains.slice(0, 3).join(', ') + '; keep the whole position on ' + chain + " so one wallet's activity is easy to read." : '';
     return [
-      'Use a fresh wallet funded only for this farm, keep the seed phrase offline, and note the date the position opens. Cost: under $3 of gas. Time: 5 minutes.',
-      actionFor(p, capital, chain) + ' Cost: $' + capital + ' of capital and about $' + (capital >= 250 ? 10 : 5) + ' of gas. Time: 15 minutes to set up.',
-      'Make one qualifying action a week on ' + chain + ': a deposit, a borrow, a swap or a governance vote. Cost: about $2 of gas a week. Time: 10 minutes a week.',
-      'Hold for at least ' + hold + ' days so the activity lands in more than one snapshot, and do not move the funds mid-window. Cost: the $' + capital + ' stays in the position. Time: ' + hold + ' days.',
-      "Check " + p.name + "'s own docs and governance forum monthly for a points or airdrop programme, and claim only from a link the protocol publishes. Cost: no fee to check, and never pay to claim. Time: 10 minutes a month.",
-      'Log the wallet, the dates and every transaction, and compare the position with the ' + upside + " the category's multiple implies before you add more. Cost: nothing but the log. Time: 5 minutes."
+      'Open a wallet used only for this farm, fund it with $' + capital + ' plus gas, and write down the date the first transaction lands.' + chains + ' Cost: $' + capital + ' of capital plus about $' + action.gas + ' of gas for the first transactions. Time: 15 minutes.',
+      action.text + ' Cost: $' + capital + ' of capital and about $' + action.gas + ' of gas at a normal fee. Time: ' + action.minutes + ' minutes to set up.',
+      'Repeat one qualifying action each week on ' + chain + ': a deposit, a borrow, a swap or a governance vote. Weekly activity across several weeks counts for more than one large transaction. Cost: about $2 to $4 of gas a week. Time: 10 minutes a week.',
+      'Hold the position for at least ' + hold + ' days without moving the funds, so the activity is recorded in more than one snapshot of the protocol’s own data. Cost: the $' + capital + ' stays in the position and earns whatever the protocol pays. Time: ' + hold + ' days.',
+      "Check " + p.name + "'s docs, blog and governance forum every month for a points, snapshot or airdrop programme, and claim only from a link the protocol itself publishes. Cost: no fee to check, and never pay anyone to claim. Time: 10 minutes a month.",
+      'Keep a log of the wallet, the dates and every transaction, and weigh the position against the ' + upside + " this category's multiple implies before adding more. Cost: nothing but the log. Time: 5 minutes."
     ];
   }
 

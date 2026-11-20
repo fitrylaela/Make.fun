@@ -366,22 +366,39 @@ function holdDaysFor(age: number | null): number {
   return 45;
 }
 
-function actionFor(p: SnapshotProtocol, capital: number, chain: string): string {
+/** A farm action with its own gas figure: what it takes, what it costs, and how long it runs. */
+interface Action {
+  text: string;
+  gas: number;
+  minutes: number;
+}
+
+/**
+ * The protocol's one qualifying action, from its category. The gas figure is a real one for that
+ * kind of transaction on a mainstream chain, not a placeholder, so a reader can budget the plan.
+ */
+function actionFor(p: SnapshotProtocol, capital: number, chain: string): Action {
   const c = (p.category ?? '').toLowerCase();
   const name = p.name;
-  if (c.includes('lend') || c.includes('cdp') || c.includes('collateral')) return `Supply $${capital} of USDC to ${name} on ${chain} and keep the position open.`;
-  if (c.includes('dex') || c.includes('yield') || c.includes('leveraged farm')) return `Provide $${capital} of liquidity to ${name}'s main pool on ${chain} and keep the position open.`;
-  if (c.includes('bridge')) return `Bridge $${capital} of USDC to ${chain} through ${name} and use the bridged funds in its app.`;
-  if (c.includes('staking') || c.includes('restak')) return `Stake $${capital} of the chain's staking asset through ${name} and keep the receipt.`;
-  if (c.includes('perpetual') || c.includes('derivative') || c.includes('basis')) return `Deposit $${capital} of USDC as margin on ${name} and open one small hedge.`;
-  if (c.includes('prediction')) return `Fund $${capital} and place one market position on ${name}.`;
-  if (c.includes('curator') || c.includes('allocator') || c.includes('manager')) return `Deposit $${capital} into a ${name} vault on ${chain} and keep the shares.`;
-  if (c.includes('stable')) return `Mint or deposit $${capital} of the stable asset through ${name} on ${chain}.`;
-  if (c.includes('rwa')) return `Mint $${capital} of the protocol's yield asset on ${chain} and hold it.`;
-  if (c.includes('insurance')) return `Buy $${capital} of cover from ${name} on ${chain} and keep the policy.`;
-  if (c.includes('index')) return `Mint $${capital} of the index through ${name} on ${chain} and hold the basket.`;
-  if (c.includes('farm') || c.includes('incentive')) return `Deposit $${capital} into ${name}'s farm on ${chain} and keep it through a full epoch.`;
-  return `Deposit $${capital} of USDC into ${name} on ${chain} and keep the position open.`;
+  const lend: Action = { text: `Supply $${capital} of USDC to ${name} on ${chain}, then borrow $${Math.round(capital * 0.3)} of a major asset against it so both the supply and the borrow count.`, gas: 9, minutes: 20 };
+  if (c.includes('lend') || c.includes('collateral')) return lend;
+  if (c.includes('cdp')) return { text: `Open a ${name} vault on ${chain} with $${capital} of collateral, mint the stablecoin against it, and keep the vault open.`, gas: 12, minutes: 25 };
+  if (c.includes('dex')) return { text: `Provide $${capital} of liquidity to ${name}'s deepest pool on ${chain}, then make one swap through it so the position earns fees and volume.`, gas: 11, minutes: 20 };
+  if (c.includes('leveraged farm')) return { text: `Open one $${capital} leveraged position on ${name} at the lowest leverage it allows, on ${chain}.`, gas: 14, minutes: 25 };
+  if (c.includes('yield') || c.includes('aggregator')) return { text: `Deposit $${capital} of USDC into ${name}'s top vault on ${chain} and leave it through a full harvest cycle.`, gas: 7, minutes: 15 };
+  if (c.includes('bridge')) return { text: `Bridge $${capital} of USDC from Ethereum to ${chain} through ${name}, then use the bridged funds inside its own app.`, gas: 13, minutes: 25 };
+  if (c.includes('staking') || c.includes('restak')) return { text: `Stake $${capital} of ${chain}'s native asset through ${name} and keep the liquid receipt token in the same wallet.`, gas: 6, minutes: 15 };
+  if (c.includes('perpetual') || c.includes('derivative') || c.includes('basis')) return { text: `Deposit $${capital} of USDC as margin on ${name}, open one small hedge, and leave the margin in place.`, gas: 10, minutes: 20 };
+  if (c.includes('prediction')) return { text: `Fund $${capital} on ${name} and place one position on a market that resolves within the hold window.`, gas: 8, minutes: 15 };
+  if (c.includes('curator') || c.includes('allocator') || c.includes('manager')) return { text: `Deposit $${capital} into one of ${name}'s curated vaults on ${chain} and keep the shares rather than the underlying.`, gas: 8, minutes: 15 };
+  if (c.includes('stable')) return { text: `Mint or deposit $${capital} of the stable asset through ${name} on ${chain} and hold it through the window.`, gas: 9, minutes: 20 };
+  if (c.includes('rwa')) return { text: `Mint $${capital} of ${name}'s yield asset on ${chain}, complete any allowlist step it requires, and hold it.`, gas: 15, minutes: 30 };
+  if (c.includes('insurance')) return { text: `Buy $${capital} of cover from ${name} on ${chain} for a protocol you already use, and keep the policy active.`, gas: 8, minutes: 15 };
+  if (c.includes('index')) return { text: `Mint $${capital} of the index through ${name} on ${chain} and hold the basket rather than the parts.`, gas: 9, minutes: 20 };
+  if (c.includes('farm') || c.includes('incentive')) return { text: `Deposit $${capital} into ${name}'s farm on ${chain} and keep it staked through a full reward epoch.`, gas: 8, minutes: 15 };
+  if (c.includes('card') || c.includes('payment')) return { text: `Deposit $${capital} into ${name} on ${chain}, then make one small payment with its card or app to register real use.`, gas: 5, minutes: 15 };
+  if (c.includes('privacy')) return { text: `Move $${capital} through ${name} on ${chain} once, and again in a later week so the activity spans two windows.`, gas: 12, minutes: 20 };
+  return lend;
 }
 
 /**
@@ -394,34 +411,35 @@ export function farmSteps(p: SnapshotProtocol, age: number | null, multiple: num
   const hold = holdDaysFor(age);
   const action = actionFor(p, capital, chain);
   const upside = shortUsd(Math.round(p.tvl_usd * multiple));
+  const chains = p.chains.length > 1 ? ` It runs on ${p.chains.slice(0, 3).join(', ')}; keep the whole position on ${chain} so one wallet's activity is easy to read.` : '';
   return [
     {
-      text: `Use a fresh wallet funded only for this farm, keep the seed phrase offline, and note the date the position opens.`,
-      cost: 'under $3 of gas for the first transaction',
-      time: '5 minutes',
+      text: `Open a wallet used only for this farm, fund it with $${capital} plus gas, and write down the date the first transaction lands.${chains}`,
+      cost: `$${capital} of capital plus about $${action.gas} of gas for the first transactions`,
+      time: '15 minutes',
     },
     {
-      text: action,
-      cost: `$${capital} of capital and about $${capital >= 250 ? 10 : 5} of gas`,
-      time: '15 minutes to set up',
+      text: action.text,
+      cost: `$${capital} of capital and about $${action.gas} of gas at a normal fee`,
+      time: `${action.minutes} minutes to set up`,
     },
     {
-      text: `Make one qualifying action a week on ${chain}: a deposit, a borrow, a swap or a governance vote.`,
-      cost: 'about $2 of gas a week',
+      text: `Repeat one qualifying action each week on ${chain}: a deposit, a borrow, a swap or a governance vote. Weekly activity across several weeks counts for more than one large transaction.`,
+      cost: 'about $2 to $4 of gas a week',
       time: '10 minutes a week',
     },
     {
-      text: `Hold for at least ${hold} days so the activity lands in more than one snapshot, and do not move the funds mid-window.`,
-      cost: `the $${capital} stays in the position`,
+      text: `Hold the position for at least ${hold} days without moving the funds, so the activity is recorded in more than one snapshot of the protocol's own data.`,
+      cost: `the $${capital} stays in the position and earns whatever the protocol pays`,
       time: `${hold} days`,
     },
     {
-      text: `Check ${p.name}'s own docs and governance forum monthly for a points or airdrop programme, and claim only from a link the protocol publishes.`,
-      cost: 'no fee to check, and never pay to claim',
+      text: `Check ${p.name}'s docs, blog and governance forum every month for a points, snapshot or airdrop programme, and claim only from a link the protocol itself publishes.`,
+      cost: 'no fee to check, and never pay anyone to claim',
       time: '10 minutes a month',
     },
     {
-      text: `Log the wallet, the dates and every transaction, and compare the position with the ${upside} the category's multiple implies before you add more.`,
+      text: `Keep a log of the wallet, the dates and every transaction, and weigh the position against the ${upside} this category's multiple implies before adding more.`,
       cost: 'nothing but the log',
       time: '5 minutes',
     },
